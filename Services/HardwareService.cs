@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using WinForms = System.Windows.Forms;
+using Spocky.Services.GpuTelemetry;
 
 namespace Spocky.Services;
 
@@ -20,6 +20,7 @@ public sealed class HardwareService : IDisposable
     private System.Threading.Timer? _timer;
     private bool _disposed;
     private string _driveRoot;
+    private readonly GpuTelemetryService _gpuTelemetryService = new();
 
     private PerformanceCounter? _cpuUsageCounter;
     private PerformanceCounter? _cpuFrequencyCounter;
@@ -267,9 +268,9 @@ public sealed class HardwareService : IDisposable
         return null;
     }
 
-    private static double? ReadGpuTemperature()
+    private double? ReadGpuTemperature()
     {
-        return null;
+        return _gpuTelemetryService.ReadCoreTemperatureC();
     }
 
     private (double? chargePercent, bool? isOnAc, bool? isCharging) ReadBatteryStatus()
@@ -475,6 +476,7 @@ public sealed class HardwareService : IDisposable
         _disposed = true;
         Stop();
         DisposeCounters();
+        _gpuTelemetryService.Dispose();
     }
 
     private void DisposeCounters()

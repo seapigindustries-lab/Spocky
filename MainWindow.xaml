@@ -91,6 +91,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="60" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0" Margin="20,16,20,0">
@@ -115,6 +116,26 @@
                                   DisplayMemberPath="Label"
                                   SelectedValuePath="Root"
                                   SelectionChanged="OnDriveSelectionChanged" />
+
+                        <TextBlock Text="PROC" Foreground="{StaticResource LcGold}" FontSize="18" FontWeight="Bold" Margin="28,0,0,0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="ProcessSortSelector"
+                                  Width="120"
+                                  Height="32"
+                                  Margin="12,0,0,0"
+                                  Style="{StaticResource LcarsComboBox}"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Value"
+                                  SelectionChanged="OnProcessSortChanged" />
+
+                        <TextBlock Text="REFRESH" Foreground="{StaticResource LcGold}" FontSize="18" FontWeight="Bold" Margin="28,0,0,0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="ProcessRefreshSelector"
+                                  Width="100"
+                                  Height="32"
+                                  Margin="12,0,0,0"
+                                  Style="{StaticResource LcarsComboBox}"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Value"
+                                  SelectionChanged="OnProcessRefreshChanged" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">
@@ -213,6 +234,30 @@
                         </Border>
                     </UniformGrid>
                 </Grid>
+
+                <Border Grid.Row="2" Margin="20,0,20,20" Background="{StaticResource LcBackground}" BorderBrush="{StaticResource LcNeonBlue}" BorderThickness="2" CornerRadius="14" Padding="18">
+                    <StackPanel>
+                        <TextBlock Text="TOP PROCESSES" Foreground="{StaticResource LcNeonBlue}" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,12" />
+                        <ItemsControl x:Name="ProcessListControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,4" Padding="10" Background="{StaticResource LcMutedOrange}" CornerRadius="10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="120" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource LcBackground}" FontSize="18" FontWeight="Bold"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding CpuText}" Foreground="{StaticResource LcBackground}" FontSize="18" HorizontalAlignment="Right" />
+                                            <TextBlock Grid.Column="2" Text="{Binding MemoryText}" Foreground="{StaticResource LcBackground}" FontSize="18" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
     </Border>

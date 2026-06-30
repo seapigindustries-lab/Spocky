@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Spocky.Models;
 using Spocky.Services;
 
 namespace Spocky;
@@ -13,7 +14,11 @@ namespace Spocky;
 public partial class MainWindow : Window
 {
     private readonly HardwareService _hardwareService = new();
+    private readonly SettingsService _settingsService = new();
+    private readonly ProcessMonitorService _processMonitorService = new();
     private readonly List<DriveOption> _driveOptions = new();
+    private IReadOnlyList<ProcessSnapshot> _latestProcessSnapshots = Array.Empty<ProcessSnapshot>();
+    private AppSettings _settings = new();
     private HardwareSnapshot? _latestSnapshot;
     private TemperatureUnit _temperatureUnit = TemperatureUnit.Celsius;
 
@@ -24,10 +29,22 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _settings = _settingsService.Load();
+        _temperatureUnit = _settings.TemperatureUnit;
+        if (!string.IsNullOrWhiteSpace(_settings.DriveRoot))
+        {
+            _hardwareService.SetDrive(_settings.DriveRoot);
+        }
+
         InitializeDriveSelector();
+        InitializeProcessControls();
         UpdateTemperatureButtons();
         _hardwareService.MetricsUpdated += OnHardwareMetricsUpdated;
         _hardwareService.Start();
+
+        _processMonitorService.ProcessesUpdated += OnProcessesUpdated;
+        _processMonitorService.SetRefreshInterval(TimeSpan.FromSeconds(_settings.ProcessRefreshSeconds));
+        _processMonitorService.Start();
     }
 
     private void OnHardwareMetricsUpdated(object? sender, HardwareSnapshot snapshot)
@@ -105,6 +122,32 @@ public partial class MainWindow : Window
             ? $"{snapshot.BatteryPercent.Value:F0} %"
             : "-- %";
         BatteryStatusText.Text = FormatBatteryStatus(snapshot);
+    }
+
+    private void OnProcessesUpdated(object? sender, IReadOnlyList<ProcessSnapshot> snapshots)
+    {
+        Dispatcher.Invoke(() => UpdateProcessList(snapshots));
+    }
+
+    private void UpdateProcessList(IReadOnlyList<ProcessSnapshot> snapshots)
+    {
+        _latestProcessSnapshots = snapshots;
+
+        IEnumerable<ProcessSnapshot> ordered = _settings.ProcessSort switch
+        {
+            ProcessSortOption.Memory => snapshots.OrderByDescending(p => p.MemoryMb),
+            _ => snapshots.OrderByDescending(p => p.CpuPercent)
+        };
+
+        var displays = ordered
+            .Take(8)
+            .Select(p => new ProcessDisplay(
+                p.Name,
+                $"CPU {p.CpuPercent:F1} %",
+                $"MEM {p.MemoryMb:F1} MB"))
+            .ToList();
+
+        ProcessListControl.ItemsSource = displays;
     }
 
     private string FormatTemperature(double celsius)
@@ -188,17 +231,44 @@ public partial class MainWindow : Window
         }
 
         DriveSelector.ItemsSource = _driveOptions.ToList();
-        var current = _hardwareService.CurrentDrive;
+        var preferred = _settings.DriveRoot ?? _hardwareService.CurrentDrive;
         DriveSelector.SelectedValue = _driveOptions
-            .FirstOrDefault(opt => string.Equals(opt.Root, current, StringComparison.OrdinalIgnoreCase))?
+            .FirstOrDefault(opt => string.Equals(opt.Root, preferred, StringComparison.OrdinalIgnoreCase))?
             .Root;
 
         if (DriveSelector.SelectedValue == null && DriveSelector.Items.Count > 0)
         {
             DriveSelector.SelectedIndex = 0;
+            if (DriveSelector.SelectedValue is string fallback)
+            {
+                _hardwareService.SetDrive(fallback);
+            }
         }
 
         UpdateStorageTitle();
+    }
+
+    private void InitializeProcessControls()
+    {
+        var sortOptions = new[]
+        {
+            new ComboOption<ProcessSortOption>(ProcessSortOption.Cpu, "CPU %"),
+            new ComboOption<ProcessSortOption>(ProcessSortOption.Memory, "Memory")
+        };
+        ProcessSortSelector.ItemsSource = sortOptions;
+        ProcessSortSelector.SelectedValue = _settings.ProcessSort;
+
+        var refreshOptions = new[]
+        {
+            new ComboOption<int>(1, "1s"),
+            new ComboOption<int>(2, "2s"),
+            new ComboOption<int>(5, "5s"),
+            new ComboOption<int>(10, "10s")
+        };
+        ProcessRefreshSelector.ItemsSource = refreshOptions;
+        var refresh = Math.Clamp(_settings.ProcessRefreshSeconds, 1, 10);
+        ProcessRefreshSelector.SelectedValue = refresh;
+        _settings.ProcessRefreshSeconds = refresh;
     }
 
     private static string FormatDriveLabel(string root)
@@ -228,7 +298,38 @@ public partial class MainWindow : Window
         if (_hardwareService.SetDrive(root))
         {
             UpdateStorageTitle();
+            _settings.DriveRoot = root;
+            PersistSettings();
         }
+    }
+
+    private void OnProcessSortChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProcessSortSelector.SelectedValue is not ProcessSortOption sort || sort == _settings.ProcessSort)
+        {
+            return;
+        }
+
+        _settings.ProcessSort = sort;
+        PersistSettings();
+        UpdateProcessList(_latestProcessSnapshots);
+    }
+
+    private void OnProcessRefreshChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProcessRefreshSelector.SelectedValue is not int seconds)
+        {
+            return;
+        }
+
+        if (_settings.ProcessRefreshSeconds == seconds)
+        {
+            return;
+        }
+
+        _settings.ProcessRefreshSeconds = seconds;
+        _processMonitorService.SetRefreshInterval(TimeSpan.FromSeconds(seconds));
+        PersistSettings();
     }
 
     private void SelectCelsius(object sender, RoutedEventArgs e)
@@ -254,6 +355,9 @@ public partial class MainWindow : Window
         {
             UpdateMetrics(_latestSnapshot.Value);
         }
+
+        _settings.TemperatureUnit = unit;
+        PersistSettings();
     }
 
     private void UpdateTemperatureButtons()
@@ -294,13 +398,19 @@ public partial class MainWindow : Window
         base.OnClosed(e);
         _hardwareService.MetricsUpdated -= OnHardwareMetricsUpdated;
         _hardwareService.Dispose();
+        _processMonitorService.ProcessesUpdated -= OnProcessesUpdated;
+        _processMonitorService.Dispose();
+        PersistSettings();
     }
 
     private sealed record DriveOption(string Root, string Label);
 
-    private enum TemperatureUnit
+    private sealed record ProcessDisplay(string Name, string CpuText, string MemoryText);
+
+    private sealed record ComboOption<T>(T Value, string Label);
+
+    private void PersistSettings()
     {
-        Celsius,
-        Fahrenheit
+        _settingsService.Save(_settings);
     }
 }
