@@ -131,7 +131,7 @@
 
                     <TextBlock Text="SYSTEM METRICS" Foreground="{StaticResource LcNeonBlue}" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,16" />
 
-                    <UniformGrid Grid.Row="1" Columns="2" Rows="2" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsItemsHost="False">
+                    <UniformGrid Grid.Row="1" Columns="3" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsItemsHost="False">
                         <Border Background="{StaticResource LcMutedOrange}" Margin="10" Padding="18" CornerRadius="14">
                             <StackPanel>
                                 <TextBlock Text="CPU PACKAGE TEMP" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
@@ -150,6 +150,14 @@
 
                         <Border Background="{StaticResource LcNeonBlue}" Margin="10" Padding="18" CornerRadius="14">
                             <StackPanel>
+                                <TextBlock Text="CPU LOAD" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="CpuLoadText" Text="-- %" Foreground="{StaticResource LcBackground}" FontSize="48" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock Text="Total utilization" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcNeonBlue}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
                                 <TextBlock Text="MEMORY USAGE" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
                                 <TextBlock x:Name="MemoryUsageText" Text="-- %" Foreground="{StaticResource LcBackground}" FontSize="48" FontWeight="Black" Margin="0,6,0,0" />
                                 <TextBlock x:Name="MemoryDetailText" Text="-- / -- GB" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
@@ -161,6 +169,46 @@
                                 <TextBlock x:Name="StorageTitleText" Text="PRIMARY STORAGE" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
                                 <TextBlock x:Name="StorageUsageText" Text="-- %" Foreground="{StaticResource LcBackground}" FontSize="48" FontWeight="Black" Margin="0,6,0,0" />
                                 <TextBlock x:Name="StorageDetailText" Text="-- / -- GB" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcViolet}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
+                                <TextBlock Text="CPU CLOCK" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="CpuClockText" Text="-- MHz" Foreground="{StaticResource LcBackground}" FontSize="48" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock Text="Current frequency" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcMutedOrange}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
+                                <TextBlock Text="DISK THROUGHPUT" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="DiskReadText" Text="Read -- MB/s" Foreground="{StaticResource LcBackground}" FontSize="28" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock x:Name="DiskWriteText" Text="Write -- MB/s" Foreground="{StaticResource LcBackground}" FontSize="20" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcNeonBlue}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
+                                <TextBlock Text="NETWORK" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="NetworkSendText" Text="Up -- Mb/s" Foreground="{StaticResource LcBackground}" FontSize="28" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock x:Name="NetworkReceiveText" Text="Down -- Mb/s" Foreground="{StaticResource LcBackground}" FontSize="20" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcGold}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
+                                <TextBlock Text="SYSTEM UPTIME" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="UptimeText" Text="--" Foreground="{StaticResource LcBackground}" FontSize="42" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock Text="Since last boot" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource LcViolet}" Margin="10" Padding="18" CornerRadius="14">
+                            <StackPanel>
+                                <TextBlock Text="BATTERY" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="BatteryPercentText" Text="-- %" Foreground="{StaticResource LcBackground}" FontSize="42" FontWeight="Black" Margin="0,6,0,0" />
+                                <TextBlock x:Name="BatteryStatusText" Text="No battery" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
                             </StackPanel>
                         </Border>
                     </UniformGrid>

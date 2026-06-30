@@ -13,6 +13,15 @@ Spocky is a native Windows 11 hardware intelligence console that channels the re
 - Temperature chips in the header instantly toggle between Celsius and Fahrenheit without restarting the polling loop.
 - The drive dropdown limits the storage card to whichever fixed drive you care about; selections are validated against the currently mounted volumes.
 
+## Metrics (driverless)
+
+- CPU package temperature (ACPI thermal zone) plus GPU placeholder for future vendor hooks.
+- CPU load and current frequency (GHz/MHz) pulled from Windows performance counters.
+- Memory usage (percent plus used/total GB) via `GlobalMemoryStatusEx`.
+- Storage utilization for the selected fixed drive, along with live disk read/write throughput in MB/s.
+- Aggregate network up/down throughput in Mb/s across active adapters.
+- System uptime since last boot and battery percentage/status (if a battery exists).
+
 ## Development
 
 1. Ensure the .NET 8 SDK is installed (`net8.0-windows`).

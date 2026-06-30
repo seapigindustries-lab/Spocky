@@ -4,32 +4,37 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using WinForms = System.Windows.Forms;
 
 namespace Spocky.Services;
 
 /// <summary>
-/// Hardware polling service that relies on ETW/WMI/managed APIs so no kernel driver is required.
+/// Driverless hardware polling service that leans on ETW/WMI/managed APIs only.
 /// </summary>
 public sealed class HardwareService : IDisposable
 {
+    private const string NetworkCategory = "Network Interface";
     private readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(1.5);
     private readonly object _driveLock = new();
-    private Timer? _timer;
+
+    private System.Threading.Timer? _timer;
     private bool _disposed;
     private string _driveRoot;
+
+    private PerformanceCounter? _cpuUsageCounter;
+    private PerformanceCounter? _cpuFrequencyCounter;
+    private PerformanceCounter? _diskReadCounter;
+    private PerformanceCounter? _diskWriteCounter;
+    private readonly List<PerformanceCounter> _networkSendCounters = new();
+    private readonly List<PerformanceCounter> _networkReceiveCounters = new();
 
     public event EventHandler<HardwareSnapshot>? MetricsUpdated;
 
     public HardwareService()
     {
-        var preferred = NormalizeDriveRoot(Path.GetPathRoot(Environment.SystemDirectory)) ?? "C:\\";
-        var drives = EnumerateFixedDriveRoots()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        _driveRoot = drives.FirstOrDefault(root => string.Equals(root, preferred, StringComparison.OrdinalIgnoreCase))
-            ?? drives.FirstOrDefault()
-            ?? preferred;
+        _driveRoot = NormalizeDriveRoot(Path.GetPathRoot(Environment.SystemDirectory)) ?? "C:\\";
+        InitializePerformanceCounters();
+        SelectBestDriveDefault();
     }
 
     public string CurrentDrive
@@ -80,7 +85,7 @@ public sealed class HardwareService : IDisposable
             return;
         }
 
-        _timer = new Timer(OnTick, null, TimeSpan.Zero, _pollInterval);
+        _timer = new System.Threading.Timer(OnTick, null, TimeSpan.Zero, _pollInterval);
     }
 
     public void Stop()
@@ -110,6 +115,9 @@ public sealed class HardwareService : IDisposable
 
         var (memoryUsedGb, memoryTotalGb, memoryPercent) = ReadMemory();
         var (storageUsedGb, storageTotalGb, storagePercent) = ReadPrimaryStorage(driveRoot);
+        var (diskRead, diskWrite) = ReadDiskThroughput();
+        var (netSend, netReceive) = ReadNetworkThroughput();
+        var (batteryPercent, batteryOnAc, batteryCharging) = ReadBatteryStatus();
 
         return new HardwareSnapshot(
             CpuPackageTempC: ReadCpuTemperature(),
@@ -119,7 +127,17 @@ public sealed class HardwareService : IDisposable
             MemoryUsagePercent: memoryPercent,
             StorageUsedGb: storageUsedGb,
             StorageTotalGb: storageTotalGb,
-            StorageUsagePercent: storagePercent);
+            StorageUsagePercent: storagePercent,
+            CpuUsagePercent: ReadCpuUsagePercent(),
+            CpuFrequencyMHz: ReadCpuFrequencyMHz(),
+            DiskReadMbPerSec: diskRead,
+            DiskWriteMbPerSec: diskWrite,
+            NetworkSendMbps: netSend,
+            NetworkReceiveMbps: netReceive,
+            SystemUptimeSeconds: ReadSystemUptimeSeconds(),
+            BatteryPercent: batteryPercent,
+            IsOnAcPower: batteryOnAc,
+            IsBatteryCharging: batteryCharging);
     }
 
     private static (double? usedGb, double? totalGb, double? percent) ReadMemory()
@@ -166,6 +184,54 @@ public sealed class HardwareService : IDisposable
         }
     }
 
+    private double? ReadCpuUsagePercent()
+    {
+        return SafeNextValue(_cpuUsageCounter);
+    }
+
+    private double? ReadCpuFrequencyMHz()
+    {
+        return SafeNextValue(_cpuFrequencyCounter);
+    }
+
+    private (double? read, double? write) ReadDiskThroughput()
+    {
+        var read = SafeNextValue(_diskReadCounter);
+        var write = SafeNextValue(_diskWriteCounter);
+
+        return (ToMegabytesPerSecond(read), ToMegabytesPerSecond(write));
+    }
+
+    private (double? send, double? receive) ReadNetworkThroughput()
+    {
+        if (_networkSendCounters.Count == 0 || _networkReceiveCounters.Count == 0)
+        {
+            return (null, null);
+        }
+
+        double totalSend = 0;
+        double totalReceive = 0;
+        foreach (var counter in _networkSendCounters)
+        {
+            var value = SafeNextValue(counter);
+            if (value.HasValue)
+            {
+                totalSend += value.Value;
+            }
+        }
+
+        foreach (var counter in _networkReceiveCounters)
+        {
+            var value = SafeNextValue(counter);
+            if (value.HasValue)
+            {
+                totalReceive += value.Value;
+            }
+        }
+
+        return (ToMegabitsPerSecond(totalSend), ToMegabitsPerSecond(totalReceive));
+    }
+
     private static double? ReadCpuTemperature()
     {
         try
@@ -186,7 +252,6 @@ public sealed class HardwareService : IDisposable
                     continue;
                 }
 
-                // Thermal zone counters report tenths of Kelvin.
                 var celsius = raw / 10.0 - 273.15;
                 if (celsius > -40 && celsius < 150)
                 {
@@ -204,9 +269,137 @@ public sealed class HardwareService : IDisposable
 
     private static double? ReadGpuTemperature()
     {
-        // GPU temperature is not exposed through built-in ETW/Perf counters without vendor APIs.
-        // We return null so the UI keeps "--" but the service stays driverless.
         return null;
+    }
+
+    private (double? chargePercent, bool? isOnAc, bool? isCharging) ReadBatteryStatus()
+    {
+        try
+        {
+            var status = WinForms.SystemInformation.PowerStatus;
+            var flags = status.BatteryChargeStatus;
+            var hasBattery = !flags.HasFlag(WinForms.BatteryChargeStatus.NoSystemBattery);
+
+            double? percent = status.BatteryLifePercent < 0 || !hasBattery
+                ? null
+                : status.BatteryLifePercent * 100.0;
+
+            bool? onAc = status.PowerLineStatus switch
+            {
+                WinForms.PowerLineStatus.Online => true,
+                WinForms.PowerLineStatus.Offline => false,
+                _ => null
+            };
+
+            bool? charging = hasBattery
+                ? flags.HasFlag(WinForms.BatteryChargeStatus.Charging)
+                : null;
+
+            return (percent, onAc, charging);
+        }
+        catch
+        {
+            return (null, null, null);
+        }
+    }
+
+    private static double ReadSystemUptimeSeconds()
+    {
+        return TimeSpan.FromMilliseconds(Environment.TickCount64).TotalSeconds;
+    }
+
+    private void InitializePerformanceCounters()
+    {
+        _cpuUsageCounter = CreateCounter("Processor", "% Processor Time", "_Total");
+        _cpuFrequencyCounter = CreateCounter("Processor Information", "Processor Frequency", "_Total");
+        _diskReadCounter = CreateCounter("PhysicalDisk", "Disk Read Bytes/sec", "_Total");
+        _diskWriteCounter = CreateCounter("PhysicalDisk", "Disk Write Bytes/sec", "_Total");
+        InitializeNetworkCounters();
+    }
+
+    private void InitializeNetworkCounters()
+    {
+        _networkSendCounters.Clear();
+        _networkReceiveCounters.Clear();
+
+        if (!PerformanceCounterCategory.Exists(NetworkCategory))
+        {
+            return;
+        }
+
+        var category = new PerformanceCounterCategory(NetworkCategory);
+        foreach (var instance in category.GetInstanceNames())
+        {
+            if (IsLoopback(instance))
+            {
+                continue;
+            }
+
+            var send = CreateCounter(NetworkCategory, "Bytes Sent/sec", instance);
+            var receive = CreateCounter(NetworkCategory, "Bytes Received/sec", instance);
+
+            if (send != null && receive != null)
+            {
+                _networkSendCounters.Add(send);
+                _networkReceiveCounters.Add(receive);
+            }
+        }
+    }
+
+    private static bool IsLoopback(string interfaceName)
+    {
+        if (string.IsNullOrWhiteSpace(interfaceName))
+        {
+            return true;
+        }
+
+        var name = interfaceName.ToLowerInvariant();
+        return name.Contains("loopback") || name.Contains("isatap") || name.Contains("tunnel");
+    }
+
+    private static PerformanceCounter? CreateCounter(string category, string counter, string? instance, bool readOnly = true)
+    {
+        try
+        {
+            if (instance == null)
+            {
+                return new PerformanceCounter(category, counter, readOnly: readOnly);
+            }
+
+            return new PerformanceCounter(category, counter, instance, readOnly: readOnly);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static double? SafeNextValue(PerformanceCounter? counter)
+    {
+        if (counter == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var value = counter.NextValue();
+            return double.IsNaN(value) ? null : value;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static double? ToMegabytesPerSecond(double? bytesPerSecond)
+    {
+        return bytesPerSecond.HasValue ? bytesPerSecond / 1024d / 1024d : null;
+    }
+
+    private static double? ToMegabitsPerSecond(double bytesPerSecond)
+    {
+        return bytesPerSecond <= 0 ? null : (bytesPerSecond * 8d) / 1024d / 1024d;
     }
 
     private static bool TryGetMemoryStatus(out ulong total, out ulong available)
@@ -263,10 +456,43 @@ public sealed class HardwareService : IDisposable
         return string.IsNullOrEmpty(root) ? null : root.ToUpperInvariant();
     }
 
+    private void SelectBestDriveDefault()
+    {
+        var drives = GetFixedDriveRoots();
+        if (drives.Count == 0)
+        {
+            return;
+        }
+
+        if (!drives.Any(root => string.Equals(root, _driveRoot, StringComparison.OrdinalIgnoreCase)))
+        {
+            _driveRoot = drives.First();
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;
         Stop();
+        DisposeCounters();
+    }
+
+    private void DisposeCounters()
+    {
+        _cpuUsageCounter?.Dispose();
+        _cpuFrequencyCounter?.Dispose();
+        _diskReadCounter?.Dispose();
+        _diskWriteCounter?.Dispose();
+
+        foreach (var counter in _networkSendCounters)
+        {
+            counter.Dispose();
+        }
+
+        foreach (var counter in _networkReceiveCounters)
+        {
+            counter.Dispose();
+        }
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
@@ -300,4 +526,14 @@ public readonly record struct HardwareSnapshot(
     double? MemoryUsagePercent,
     double? StorageUsedGb,
     double? StorageTotalGb,
-    double? StorageUsagePercent);
+    double? StorageUsagePercent,
+    double? CpuUsagePercent,
+    double? CpuFrequencyMHz,
+    double? DiskReadMbPerSec,
+    double? DiskWriteMbPerSec,
+    double? NetworkSendMbps,
+    double? NetworkReceiveMbps,
+    double? SystemUptimeSeconds,
+    double? BatteryPercent,
+    bool? IsOnAcPower,
+    bool? IsBatteryCharging);

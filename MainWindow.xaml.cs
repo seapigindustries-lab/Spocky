@@ -49,6 +49,14 @@ public partial class MainWindow : Window
             ? FormatTemperature(snapshot.GpuCoreTempC.Value)
             : TemperaturePlaceholder();
 
+        CpuLoadText.Text = snapshot.CpuUsagePercent.HasValue
+            ? FormatPercent(snapshot.CpuUsagePercent.Value)
+            : "-- %";
+
+        CpuClockText.Text = snapshot.CpuFrequencyMHz.HasValue
+            ? FormatFrequency(snapshot.CpuFrequencyMHz.Value)
+            : "-- MHz";
+
         if (snapshot.MemoryUsagePercent.HasValue)
         {
             MemoryUsageText.Text = FormatPercent(snapshot.MemoryUsagePercent.Value);
@@ -84,6 +92,19 @@ public partial class MainWindow : Window
         {
             StorageDetailText.Text = "-- / -- GB";
         }
+
+        DiskReadText.Text = FormatDataRate("Read", snapshot.DiskReadMbPerSec);
+        DiskWriteText.Text = FormatDataRate("Write", snapshot.DiskWriteMbPerSec);
+        NetworkSendText.Text = FormatNetworkRate("Up", snapshot.NetworkSendMbps);
+        NetworkReceiveText.Text = FormatNetworkRate("Down", snapshot.NetworkReceiveMbps);
+        UptimeText.Text = snapshot.SystemUptimeSeconds.HasValue
+            ? FormatUptime(snapshot.SystemUptimeSeconds.Value)
+            : "--";
+
+        BatteryPercentText.Text = snapshot.BatteryPercent.HasValue
+            ? $"{snapshot.BatteryPercent.Value:F0} %"
+            : "-- %";
+        BatteryStatusText.Text = FormatBatteryStatus(snapshot);
     }
 
     private string FormatTemperature(double celsius)
@@ -101,9 +122,61 @@ public partial class MainWindow : Window
         return $"{value.ToString("F0", CultureInfo.InvariantCulture)} %";
     }
 
+    private static string FormatFrequency(double mhz)
+    {
+        return mhz >= 1000
+            ? $"{(mhz / 1000d).ToString("F2", CultureInfo.InvariantCulture)} GHz"
+            : $"{mhz.ToString("F0", CultureInfo.InvariantCulture)} MHz";
+    }
+
     private string TemperaturePlaceholder()
     {
         return _temperatureUnit == TemperatureUnit.Celsius ? "-- °C" : "-- °F";
+    }
+
+    private static string FormatDataRate(string label, double? value)
+    {
+        return value.HasValue
+            ? $"{label} {value.Value.ToString("F1", CultureInfo.InvariantCulture)} MB/s"
+            : $"{label} -- MB/s";
+    }
+
+    private static string FormatNetworkRate(string label, double? value)
+    {
+        return value.HasValue
+            ? $"{label} {value.Value.ToString("F1", CultureInfo.InvariantCulture)} Mb/s"
+            : $"{label} -- Mb/s";
+    }
+
+    private static string FormatUptime(double seconds)
+    {
+        var span = TimeSpan.FromSeconds(seconds);
+        if (span.TotalDays >= 1)
+        {
+            return $"{(int)span.TotalDays}d {span.Hours:D2}h {span.Minutes:D2}m";
+        }
+
+        return $"{span.Hours:D2}h {span.Minutes:D2}m";
+    }
+
+    private static string FormatBatteryStatus(HardwareSnapshot snapshot)
+    {
+        if (!snapshot.BatteryPercent.HasValue && snapshot.IsOnAcPower == null && snapshot.IsBatteryCharging == null)
+        {
+            return "No battery";
+        }
+
+        if (snapshot.IsOnAcPower == true)
+        {
+            return snapshot.IsBatteryCharging == true ? "Charging (AC)" : "On AC power";
+        }
+
+        if (snapshot.IsOnAcPower == false)
+        {
+            return "On battery";
+        }
+
+        return "Battery status unknown";
     }
 
     private void InitializeDriveSelector()
@@ -185,14 +258,14 @@ public partial class MainWindow : Window
 
     private void UpdateTemperatureButtons()
     {
-        var active = (Brush)FindResource("LcNeonBlue");
-        var inactive = (Brush)FindResource("LcMutedOrange");
+        var active = (System.Windows.Media.Brush)FindResource("LcNeonBlue");
+        var inactive = (System.Windows.Media.Brush)FindResource("LcMutedOrange");
 
         SetChipVisuals(CelsiusButton, _temperatureUnit == TemperatureUnit.Celsius ? active : inactive);
         SetChipVisuals(FahrenheitButton, _temperatureUnit == TemperatureUnit.Fahrenheit ? active : inactive);
     }
 
-    private static void SetChipVisuals(Button button, Brush brush)
+    private static void SetChipVisuals(System.Windows.Controls.Button button, System.Windows.Media.Brush brush)
     {
         button.Background = brush;
         button.BorderBrush = brush;
