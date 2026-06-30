@@ -5,11 +5,11 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
-            <Color x:Key="LcBackground">#FF000000</Color>
-            <Color x:Key="LcMutedOrange">#FFFF9900</Color>
-            <Color x:Key="LcViolet">#FFCC99CC</Color>
-            <Color x:Key="LcNeonBlue">#FF6699CC</Color>
-            <Color x:Key="LcGold">#FFFFCC00</Color>
+            <SolidColorBrush x:Key="LcBackground" Color="#FF000000" />
+            <SolidColorBrush x:Key="LcMutedOrange" Color="#FFFF9900" />
+            <SolidColorBrush x:Key="LcViolet" Color="#FFCC99CC" />
+            <SolidColorBrush x:Key="LcNeonBlue" Color="#FF6699CC" />
+            <SolidColorBrush x:Key="LcGold" Color="#FFFFCC00" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
