@@ -1,12 +1,12 @@
 # Spocky
 
-Spocky is a native Windows 11 hardware intelligence console that channels the retro-futuristic LCARS interface language while recreating the feature set of legacy Speccy. Built on WPF for .NET 8, it wraps LibreHardwareMonitorLib to surface accurate CPU, GPU, memory, and storage telemetry with a minimal 1.5-second polling cadence.
+Spocky is a native Windows 11 hardware intelligence console that channels the retro-futuristic LCARS interface language while recreating the feature set of legacy Speccy. Built on WPF for .NET 8, it now uses only inbox ETW/WMI/perf-counter sources so no kernel drivers are required or flagged by Defender, while still exposing CPU thermal zones (when available), memory load, and primary storage metrics on a 1.5-second cadence.
 
 ## Stack
 
 - .NET 8 (Windows target)
 - WPF with a custom chrome-free LCARS layout
-- LibreHardwareMonitorLib for sensor access (requires administrator privileges)
+- ETW/WMI/Performance Counters for driverless telemetry (no UAC prompt required)
 
 ## Development
 
@@ -14,4 +14,4 @@ Spocky is a native Windows 11 hardware intelligence console that channels the re
 2. Restore dependencies: `dotnet restore`
 3. Build & run: `dotnet run`
 
-Because LibreHardwareMonitorLib needs ring-0 sensor access, Spocky requests elevated rights via `app.manifest`. Always launch from an elevated shell when debugging to ensure hardware sensors populate.
+Because the telemetry stack is driverless, Spocky launches fine without elevation. Some machines do not surface the "Thermal Zone Information" counters—when that happens CPU/GPU tiles will fallback to `--` until the OS exposes data.
