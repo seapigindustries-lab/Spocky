@@ -49,10 +49,10 @@
                     <Path Fill="{StaticResource LcNeonBlue}" Stretch="Fill" StrokeThickness="0" Data="M0,0 L260,0 L260,180 Q200,240 140,240 L0,240 Z" />
                 </Canvas>
 
-                <StackPanel Grid.Row="1" Margin="18,0" VerticalAlignment="Top" Spacing="14">
-                    <Button Content="SYS" Style="{StaticResource LcarsNavButton}" />
-                    <Button Content="CPU" Style="{StaticResource LcarsNavButton}" />
-                    <Button Content="MEM" Style="{StaticResource LcarsNavButton}" />
+                <StackPanel Grid.Row="1" Margin="18,0" VerticalAlignment="Top">
+                    <Button Content="SYS" Style="{StaticResource LcarsNavButton}" Margin="0,0,0,14" />
+                    <Button Content="CPU" Style="{StaticResource LcarsNavButton}" Margin="0,0,0,14" />
+                    <Button Content="MEM" Style="{StaticResource LcarsNavButton}" Margin="0,0,0,14" />
                     <Button Content="STRG" Style="{StaticResource LcarsNavButton}" />
                 </StackPanel>
 
@@ -69,8 +69,8 @@
                 </Grid.RowDefinitions>
 
                 <DockPanel Grid.Row="0" Margin="20,16,20,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-                        <Button Content="_" Width="40" Height="24" Click="MinimizeWindow" Background="{StaticResource LcViolet}" BorderBrush="{StaticResource LcViolet}" Foreground="{StaticResource LcBackground}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="_" Width="40" Height="24" Click="MinimizeWindow" Background="{StaticResource LcViolet}" BorderBrush="{StaticResource LcViolet}" Foreground="{StaticResource LcBackground}" Margin="0,0,12,0" />
                         <Button Content="X" Width="40" Height="24" Click="CloseWindow" Background="{StaticResource LcMutedOrange}" BorderBrush="{StaticResource LcMutedOrange}" Foreground="{StaticResource LcBackground}" />
                     </StackPanel>
                 </DockPanel>

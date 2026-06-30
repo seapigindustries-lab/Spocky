@@ -194,7 +194,6 @@ public sealed class HardwareService : IDisposable
     {
         Stop();
         _computer.Close();
-        _computer.Dispose();
     }
 }
 
