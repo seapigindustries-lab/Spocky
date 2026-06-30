@@ -29,6 +29,31 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="LcarsChipButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource LcMutedOrange}" />
+            <Setter Property="BorderBrush" Value="{StaticResource LcMutedOrange}" />
+            <Setter Property="Foreground" Value="{StaticResource LcBackground}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="LcarsComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource LcViolet}" />
+            <Setter Property="BorderBrush" Value="{StaticResource LcViolet}" />
+            <Setter Property="Foreground" Value="{StaticResource LcBackground}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="8,2" />
+        </Style>
     </Window.Resources>
     <Border Background="{StaticResource LcBackground}" CornerRadius="18" Padding="0" BorderBrush="{StaticResource LcMutedOrange}" BorderThickness="2">
         <Grid Margin="0">
@@ -68,12 +93,35 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <DockPanel Grid.Row="0" Margin="20,16,20,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Grid Grid.Row="0" Margin="20,16,20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="TEMP" Foreground="{StaticResource LcGold}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="CelsiusButton" Content="°C" Style="{StaticResource LcarsChipButton}" Click="SelectCelsius" />
+                            <Button x:Name="FahrenheitButton" Content="°F" Style="{StaticResource LcarsChipButton}" Margin="8,0,0,0" Click="SelectFahrenheit" />
+                        </StackPanel>
+
+                        <TextBlock Text="DRIVE" Foreground="{StaticResource LcGold}" FontSize="18" FontWeight="Bold" Margin="28,0,0,0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="DriveSelector"
+                                  Width="140"
+                                  Height="32"
+                                  Margin="12,0,0,0"
+                                  Style="{StaticResource LcarsComboBox}"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Root"
+                                  SelectionChanged="OnDriveSelectionChanged" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">
                         <Button Content="_" Width="40" Height="24" Click="MinimizeWindow" Background="{StaticResource LcViolet}" BorderBrush="{StaticResource LcViolet}" Foreground="{StaticResource LcBackground}" Margin="0,0,12,0" />
                         <Button Content="X" Width="40" Height="24" Click="CloseWindow" Background="{StaticResource LcMutedOrange}" BorderBrush="{StaticResource LcMutedOrange}" Foreground="{StaticResource LcBackground}" />
                     </StackPanel>
-                </DockPanel>
+                </Grid>
 
                 <Grid Grid.Row="1" Margin="20">
                     <Grid.RowDefinitions>
@@ -110,7 +158,7 @@
 
                         <Border Background="{StaticResource LcGold}" Margin="10" Padding="18" CornerRadius="14">
                             <StackPanel>
-                                <TextBlock Text="PRIMARY STORAGE" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
+                                <TextBlock x:Name="StorageTitleText" Text="PRIMARY STORAGE" Foreground="{StaticResource LcBackground}" FontSize="20" FontWeight="Bold" />
                                 <TextBlock x:Name="StorageUsageText" Text="-- %" Foreground="{StaticResource LcBackground}" FontSize="48" FontWeight="Black" Margin="0,6,0,0" />
                                 <TextBlock x:Name="StorageDetailText" Text="-- / -- GB" Foreground="{StaticResource LcBackground}" FontSize="16" Opacity="0.9" />
                             </StackPanel>

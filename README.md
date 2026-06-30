@@ -8,6 +8,11 @@ Spocky is a native Windows 11 hardware intelligence console that channels the re
 - WPF with a custom chrome-free LCARS layout
 - ETW/WMI/Performance Counters for driverless telemetry (no UAC prompt required)
 
+## Controls
+
+- Temperature chips in the header instantly toggle between Celsius and Fahrenheit without restarting the polling loop.
+- The drive dropdown limits the storage card to whichever fixed drive you care about; selections are validated against the currently mounted volumes.
+
 ## Development
 
 1. Ensure the .NET 8 SDK is installed (`net8.0-windows`).

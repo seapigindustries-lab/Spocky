@@ -1,0 +1,75 @@
+================================================================================
+                     SPOCKY - END OF DAY REPORT
+================================================================================
+                            2026-06-29
+================================================================================
+
+COMPLETION: 100%
+- Bootstrap & Repo Setup: 100%
+
+================================================================================
+WHAT WAS ACCOMPLISHED TODAY
+================================================================================
+- Scaffolded the entire Spocky WPF/.NET 8 solution with LCARS-themed UI, manifest wiring, and pushed the initial commit to GitHub.
+- Added the first HardwareService implementation, hooked it to the UI, and resolved build issues by installing the .NET 8 SDK locally.
+- Replaced LibreHardwareMonitor with a driverless ETW/WMI-based telemetry stack, updated the manifest to run as-invoker, and refreshed the README to reflect the safer approach.
+
+================================================================================
+CURRENT PHASE
+================================================================================
+Telemetry refactor & build stabilization for the LCARS desktop client.
+
+================================================================================
+DECISIONS LOG
+================================================================================
+- Decision: Remove LibreHardwareMonitor/WinRing0 dependency. Reason: Defender flagged WinRing0.sys as VulnerableDriver; switching to ETW/WMI avoids AV hits and keeps installs frictionless.
+- Decision: Set the manifest to `asInvoker`. Reason: Without the kernel driver requirement, elevation only created UAC friction and blocked `dotnet run`/`build`.
+- Decision: Defer Fahrenheit toggle and per-drive selection. Reason: Need a working baseline first; upcoming settings will sit on top of the new driverless service.
+
+================================================================================
+FILES TOUCHED
+================================================================================
+- Created: .gitignore — filters build/temp artifacts.
+- Created: App.xaml — central LCARS palette resources.
+- Created: App.xaml.cs — application bootstrap.
+- Created: MainWindow.xaml — custom chrome-free LCARS layout and controls.
+- Created: MainWindow.xaml.cs — hooks HardwareService to UI and handles window chrome.
+- Created: Services/HardwareService.cs — telemetry polling (later refactored to ETW/WMI).
+- Created: Spocky.csproj — .NET 8 WPF project configuration with manifest linkage.
+- Created: app.manifest — declares execution level (now `asInvoker`).
+- Created: README.md — describes brand, stack, and run instructions.
+- Modified: MainWindow.xaml — replaced unsupported spacing props with margin-based layout tweaks.
+- Modified: App.xaml — palette resources now declared as SolidColorBrush for runtime binding.
+- Modified: Services/HardwareService.cs — switched from LibreHardwareMonitor to driverless ETW/WMI implementation.
+- Modified: README.md — documents the driverless telemetry approach and updated run guidance.
+- Modified: Spocky.csproj — removed LibreHardwareMonitor package reference.
+- Modified: app.manifest — toggled requested execution level between admin and as-invoker as requirements evolved.
+
+================================================================================
+NEXT STEPS
+================================================================================
+PRIORITY:
+1. Close the elevated Spocky.exe instance (PID 1184) so builds can overwrite the binary, then rerun `dotnet build`/`run` to verify the driverless stack end-to-end.
+2. Design temperature-unit settings (C/F toggle) and per-drive monitoring selection UI plus supporting config model.
+3. Plan the next sensor expansions (additional services/metrics) now that the telemetry contract is stable.
+
+POSSIBLE IMPROVEMENTS:
+- Investigate vendor APIs (NVIDIA NVML, AMD ADL, etc.) for optional GPU temperature support without kernel drivers.
+- Add logging/diagnostics for missing thermal counters so we can surface actionable troubleshooting info in the UI.
+- Introduce a basic settings persistence layer to store future toggles.
+
+================================================================================
+KNOWN ISSUES / BUGS
+================================================================================
+1. Severity: Medium — An elevated Spocky.exe (PID 1184) is still running and locks `bin/Debug/Spocky.exe`, causing `dotnet build` copy failures until the process is closed.
+2. Severity: Low — CPU temperature tile shows `--` on hardware that does not expose the "Thermal Zone Information" counter; needs fallback messaging.
+3. Severity: Low — GPU temperature tile is currently blank by design because no driverless source exists yet.
+
+================================================================================
+CONTINUATION PROMPT
+================================================================================
+(Paste this into the next session to resume context.)
+Spocky now builds with a driverless ETW/WMI telemetry service, but an elevated Spocky.exe (PID 1184) is still locking the build output. Close that process, rerun `dotnet build`/`run` to confirm the refactor, then start designing the Fahrenheit/Celsius toggle plus per-drive monitoring settings while keeping future services in mind.
+================================================================================
+END OF REPORT
+================================================================================

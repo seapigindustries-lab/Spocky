@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -7,15 +8,70 @@ using System.Threading;
 namespace Spocky.Services;
 
 /// <summary>
-/// Hardware polling service that relies exclusively on ETW/WMI/managed APIs so no kernel driver is required.
+/// Hardware polling service that relies on ETW/WMI/managed APIs so no kernel driver is required.
 /// </summary>
 public sealed class HardwareService : IDisposable
 {
     private readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(1.5);
+    private readonly object _driveLock = new();
     private Timer? _timer;
     private bool _disposed;
+    private string _driveRoot;
 
     public event EventHandler<HardwareSnapshot>? MetricsUpdated;
+
+    public HardwareService()
+    {
+        var preferred = NormalizeDriveRoot(Path.GetPathRoot(Environment.SystemDirectory)) ?? "C:\\";
+        var drives = EnumerateFixedDriveRoots()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        _driveRoot = drives.FirstOrDefault(root => string.Equals(root, preferred, StringComparison.OrdinalIgnoreCase))
+            ?? drives.FirstOrDefault()
+            ?? preferred;
+    }
+
+    public string CurrentDrive
+    {
+        get
+        {
+            lock (_driveLock)
+            {
+                return _driveRoot;
+            }
+        }
+    }
+
+    public IReadOnlyList<string> GetFixedDriveRoots()
+    {
+        return EnumerateFixedDriveRoots()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(root => root)
+            .ToList();
+    }
+
+    public bool SetDrive(string? driveRoot)
+    {
+        var normalized = NormalizeDriveRoot(driveRoot);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return false;
+        }
+
+        var available = GetFixedDriveRoots();
+        if (!available.Any(root => string.Equals(root, normalized, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        lock (_driveLock)
+        {
+            _driveRoot = normalized;
+        }
+
+        return true;
+    }
 
     public void Start()
     {
@@ -44,10 +100,16 @@ public sealed class HardwareService : IDisposable
         MetricsUpdated?.Invoke(this, snapshot);
     }
 
-    private static HardwareSnapshot CollectSnapshot()
+    private HardwareSnapshot CollectSnapshot()
     {
+        string driveRoot;
+        lock (_driveLock)
+        {
+            driveRoot = _driveRoot;
+        }
+
         var (memoryUsedGb, memoryTotalGb, memoryPercent) = ReadMemory();
-        var (storageUsedGb, storageTotalGb, storagePercent) = ReadPrimaryStorage();
+        var (storageUsedGb, storageTotalGb, storagePercent) = ReadPrimaryStorage(driveRoot);
 
         return new HardwareSnapshot(
             CpuPackageTempC: ReadCpuTemperature(),
@@ -74,21 +136,23 @@ public sealed class HardwareService : IDisposable
         return (used, total, percent);
     }
 
-    private static (double? usedGb, double? totalGb, double? percent) ReadPrimaryStorage()
+    private static (double? usedGb, double? totalGb, double? percent) ReadPrimaryStorage(string? preferredDrive)
     {
         try
         {
-            var systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
-            var drive = DriveInfo.GetDrives()
+            var drives = DriveInfo.GetDrives()
                 .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
-                .OrderByDescending(d => d.Name.Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
-                .ThenBy(d => d.Name)
-                .FirstOrDefault();
+                .ToList();
 
-            if (drive == null)
+            if (drives.Count == 0)
             {
                 return (null, null, null);
             }
+
+            var normalizedPreferred = NormalizeDriveRoot(preferredDrive);
+            var drive = drives
+                .FirstOrDefault(d => string.Equals(NormalizeDriveRoot(d.Name), normalizedPreferred, StringComparison.OrdinalIgnoreCase))
+                ?? drives.First();
 
             var total = BytesToGigabytes(drive.TotalSize);
             var free = BytesToGigabytes(drive.TotalFreeSpace);
@@ -169,6 +233,34 @@ public sealed class HardwareService : IDisposable
     private static double BytesToGigabytes(long value)
     {
         return value / 1024d / 1024d / 1024d;
+    }
+
+    private static IEnumerable<string> EnumerateFixedDriveRoots()
+    {
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            if (!drive.IsReady || drive.DriveType != DriveType.Fixed)
+            {
+                continue;
+            }
+
+            var root = NormalizeDriveRoot(drive.Name);
+            if (!string.IsNullOrEmpty(root))
+            {
+                yield return root;
+            }
+        }
+    }
+
+    private static string? NormalizeDriveRoot(string? driveRoot)
+    {
+        if (string.IsNullOrWhiteSpace(driveRoot))
+        {
+            return null;
+        }
+
+        var root = Path.GetPathRoot(driveRoot);
+        return string.IsNullOrEmpty(root) ? null : root.ToUpperInvariant();
     }
 
     public void Dispose()
